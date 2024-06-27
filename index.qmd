@@ -15,7 +15,7 @@ editor_options:
 
 <div class="author-info">
 
-Jood Al Aswad<sup>1\*</sup>, Justin L. Penn<sup>2</sup>, Pedro Monarrez<sup>1</sup> <sup>3</sup>, Mohamad Bazzi<sup>1</sup>, Curtis Deutsch<sup>2</sup>, Jonathan L. Payne<sup>1</sup><br>
+Jood Al Aswad<sup>1\*</sup>, Justin L. Penn<sup>2</sup>, Pedro Monarrez<sup>1,</sup> <sup>3</sup>, Mohamad Bazzi<sup>1</sup>, Curtis Deutsch<sup>2</sup>, Jonathan L. Payne<sup>1</sup><br>
 
 <p>
 
@@ -23,7 +23,7 @@ Jood Al Aswad<sup>1\*</sup>, Justin L. Penn<sup>2</sup>, Pedro Monarrez<sup>1</s
 
 <div class="affiliation-info">
 
-<sup>1</sup> Department of Earth and Planetary Sciences, Stanford University, 450 Jane Stanford Way, Stanford, CA 94305, USA.<br> <sup>2</sup> Department of Geosciences, Princeton University, Guyot Hall, Princeton, NJ 08544, USA.<br>
+<sup>1</sup> Department of Earth and Planetary Sciences, Stanford University, 450 Jane Stanford Way, Stanford, CA 94305, USA.<br> <sup>2</sup> Department of Geosciences, Princeton University, Guyot Hall, Princeton, NJ 08544, USA.<br> <sup>3</sup> Department of Earth, Planetary, and Space Sciences, University of Los Angeles, CA 90095, USA.<br>
 
 ```{=html}
 <style> 
@@ -47,9 +47,8 @@ Correspondence and requests for materials should be addressed to J.A.A [Contact]
 
 ## Libraries
 
-```{r message=FALSE}
-rpkg <- c("dplyr ggplot2 readr boot divvy terra divDyn paleobioDB conflicted piggyback
-          CoordinateCleaner fossilbrush rgplates icosa tidyr tibble readr purrr downloadthis ggpubr")
+```{r, message=FALSE}
+rpkg <- c("dplyr ggplot2 readr boot divvy terra divDyn paleobioDB conflicted piggyback CoordinateCleaner fossilbrush rgplates icosa tidyr tibble readr purrr downloadthis ggpubr")
 
 import_pkg <- function(x)
   x |> trimws() |> strsplit("\\s+")  |> unlist() |> 
@@ -181,27 +180,222 @@ czekanowski_data_prep <- function(x, cell, accepted_name) {
     
     return(result)
 }
+
+# To calculate BC:
+BC <- function(genera, localities) {
+  O <- length(genera) # occs
+  N <- length(unique(genera)) # genera
+  L <- length(unique(localities))
+  return((O-N)/((L*N)-N))
+}
 ```
 
 ## Paleobiology Database
 
-The fossil occurrence data analysed in this study wa retrieved from the [Paleobiology Database](https://paleobiodb.org/#/) on February of 2024. Data pre-processing made use of functions from the `fossilbrush` and `CoordinateCleaner` R packages.
+The fossil occurrence data analysed in this study was retrieved from the [Paleobiology Database](https://paleobiodb.org/#/) on February of 2024. Data pre-processing made use of functions from the `fossilbrush` and `CoordinateCleaner` R packages.
 
-```{r message=FALSE}
+```{r,message=FALSE}
 # Read occurrence dataset.
 pbdb <- 
-  openxlsx::read.xlsx(xlsxFile = "/Users/geojood/Desktop/Homogenization/pbdb.xlsx") |> 
-  # Keep two classes and select the Induan and Changhsingian.
-  filter(class %in% c("Gastropoda","Bivalvia"),
+ pbdb <-read.csv(file = '~/Desktop/PT/Codes/pbdb.feb2024.csv')
+
+# Adjust radiometric ages
+interval.ma    <- pbdb |> 
+  group_by(early_interval) |> 
+ summarise(min_ma = min(min_ma))
+names(interval.ma) <-c("early_interval", "interval.ma")
+pbdb       <- merge(pbdb, interval.ma, by=c("early_interval"))
+
+# Find first and last occurrences and merge back into data frame, using min_ma column
+fadlad <- pbdb |> 
+  group_by(accepted_name)  |> 
+  summarise(
+    fad = max(interval.ma),
+    lad = min(interval.ma)
+  )
+
+# Merge fad and lad information into data frame
+pbdb <- merge(pbdb, fadlad, by=c("accepted_name"))
+
+# Add extinction/survivor binary variable
+pbdb$ex <- 0
+pbdb$ex[pbdb$interval.ma==pbdb$lad] <- 1
+
+# Keep two classes and select the Induan and Changhsingian.
+ pbdb <- pbdb |> 
+   filter(class %in% c("Gastropoda","Bivalvia"),
          interval.ma %in% c("252.17","251.2")) |> 
-  # Identify Invalid Coordinates.
+# Identify Invalid Coordinates.
   cc_val(lat = "paleolat", lon = "paleolng")
+ 
+# Use fossilbrush to clean taxonomic errors
+b_ranks <- c("phylum", "class", "order", "family", "accepted_name") #accepted_name is genus name
+
+# Define a list of suffixes to be used at each taxonomic level when scanning for synonyms
+b_suff = list(NULL, NULL, NULL, NULL, c("ina", "ella", "etta"))
+
+pbdb2 <- check_taxonomy(pbdb, suff_set = b_suff, ranks = b_ranks, verbose = FALSE,
+                         clean_name = TRUE, resolve_duplicates = TRUE, jump = 5)
+# resolves homonyms, and jump refers to which taxonomic rank is the highest we resolve to. jump = 5 will stop before phylum since phylum level usually has little error.
+
+# Extract PBDB data from obdb2 so we have the corrected taxa:
+pbdb <- pbdb2$data[1:nrow(pbdb),]
 
 # Select variables.
 pbdb <- pbdb |> 
-  select(any_of(c("cell","early_interval","interval.ma","occurrence_no","fad","lad",
+  select(any_of(c("early_interval","interval.ma","occurrence_no","fad","lad",
                   "accepted_name","lat","long","ex","phylum","class","paleolat",
                   "paleolng","collection_no","reference_no")))
+
+
+```
+
+# Visualization of Cells and Occurrences
+
+The globe is divided into a grid of equal-area icosahedral hexagonal cells using the `hexagrid()` function in `icosa`. In `hexagrid(deg = x)`, is roughly equivalent to longitudinal degrees, so that a degree of 1 is roughly equal to 111 km. This selects a tessellation vector, which translates to the amount of area you select for each cell. In our specified grid, each cell is roughly 600,000 km^2^ and results in a grid of 642 cells.
+
+```{r, message=FALSE}
+
+# Get raw dataset before filtering for 20 occs
+pbdb.2cha <- pbdb |> filter(interval.ma==252.17)
+pbdb.2ind <- pbdb |> filter(interval.ma==251.2)
+
+# Find raw locations for each stage:
+coords.cha <- subset(pbdb.2cha, select = c(paleolng, paleolat)) 
+coords.cha <- coords.cha |>  
+                          mutate_at(c('paleolng', 'paleolat'), as.numeric)
+coords.ind <- subset(pbdb.2ind, select = c(paleolng, paleolat)) 
+coords.ind <- coords.ind |>  
+                          mutate_at(c('paleolng', 'paleolat'), as.numeric)
+
+# Set up the grid
+hexa <-hexagrid(deg=5, sf=TRUE) #each deg = ~111 km
+hexa
+
+# Find cell locations for each occurrence
+cells.cha <-locate(hexa,coords.cha) 
+#str(cells.cha) #to see which cells have occ's
+cells.ind <-locate(hexa, coords.ind)
+#str(cells.ind)
+
+# Next add cells to coords in order to match cells with their coordinates:
+coords.cha$cell <- cells.cha 
+names(coords.cha) <- c("long", "lat", "cell")
+coords.ind$cell <- cells.ind 
+names(coords.ind) <- c("long", "lat", "cell")
+
+tcells.cha <- table(cells.cha) #to get no. of occupied cells
+#str(tcells.cha) #get frequency of cell occ's
+tcells.ind <- table(cells.ind)
+#str(tcells.ind)
+
+data.2cha <- cbind(pbdb.2cha, coords.cha) #assigns cell number for each occurrence
+data.2ind <- cbind(pbdb.2ind, coords.ind)
+
+pbdb <-rbind(data.2cha, data.2ind)
+```
+
+**Grid Plots**
+
+Next, visualize all occurrences for each stage, using the package `rgplates` and `icosa` on R. Please note that this version requires that you have the `Gplates` software installed in your computer, as it is the most optimal version of `rgplates`.
+
+```{r, message=FALSE}
+
+# Call to Gplates offline (requires installed Gplates software)
+
+td <-tempdir() #temporary directory
+#td
+rgPath <- system.file(package="rgplates")
+#list.files(rgPath) #confirm that this is the correct path
+unzip(file.path(rgPath, "extdata/paleomap_v3.zip"), exdir=td)
+#list.files(file.path(td)) #confirm extraction has happened by looking at temporary directory
+pathToPolygons <- file.path(td, "PALEOMAP_PlatePolygons.gpml") #static plate polygons
+pathToRotations <- file.path(td, "PALEOMAP_PlateModel.rot")
+
+pm <- platemodel(
+  features = c("static_polygons" = pathToPolygons),
+  rotation = pathToRotations
+)
+
+# Plot it out:
+edge <-mapedge() #edge of the map
+plates.pt<- reconstruct("static_polygons", age= 252, model =pm)
+plot(edge, col = "lightblue2")
+plot(plates.pt$geometry, col = "gray60", border = NA, add = TRUE)
+plot(hexa,  border="white",add = TRUE)
+gridlabs(hexa, cex=0.5) #get labels for each cell, labeled as spiral from North pole of grid
+```
+
+**Changhsingian occurrences**
+
+Occurrences in the Changhsingian, with colors indicating the number of occurrences in occupied cells.
+
+```{r}
+#Permian:
+platesMoll <- sf::st_transform(plates.pt, "ESRI:54009")
+#^transform plates to Mollweide projection to plot
+plot(hexa, tcells.cha, 
+     crs ="ESRI:54009",
+     border = "lightgrey",
+     pal=c("#440154ff","darkorchid2","deepskyblue","royalblue", "goldenrod"),
+     breaks = c(0, 20, 100, 200, 400, 600),
+     reset=FALSE)
+plot(platesMoll$geometry, add = TRUE,border= NA, col = "#66666688")
+```
+
+**Induan occurrences**
+
+Occurrences in the Induan, with colors indicating the number of occurrences in occupied cells.
+
+```{r}
+#Triassic:
+plot(hexa, tcells.ind, 
+     crs ="ESRI:54009",
+     border = "lightgrey",
+     pal=c("#440154ff","darkorchid2","deepskyblue","royalblue", "goldenrod"),
+     breaks = c(0, 20, 100, 200, 400, 600),
+     reset=FALSE)
+plot(platesMoll$geometry, add = TRUE,border= NA, col = "#66666688")
+```
+
+## Biogeographic Connectedness (BC)
+
+Here, we follow the equation from Sidor et al. 2013 to investigate changes in Biogeographic Connectedness.
+
+```{r}
+# Calculate BC using the function we created earlier
+bc.pt <- pbdb |> 
+  group_by(early_interval) |> 
+  summarise(
+    BC = BC(accepted_name, cell),
+    count_accepted_name = n(),
+    count_unique_accepted_name = n_distinct(accepted_name)
+  )
+names(bc.pt) <- c("stage", "BC","occurrences","genera")
+
+#Visualize:
+
+bc.pt |> 
+  group_by(stage) |> 
+ ggplot(aes(x = stage, y = BC, fill = stage)) +
+  scale_fill_manual(values =  c("deepskyblue", "dodgerblue4")) +
+  scale_color_manual(values =  c("deepskyblue", "dodgerblue4")) +
+  geom_bar(stat = "identity") +
+theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 8, face = "bold"),
+        axis.title = element_text(size = 8,face = "bold"),
+        axis.text = element_text(size = 8),
+        strip.text = element_text(face = "bold"),
+        legend.position = "none",
+        aspect.ratio = 1)
+
+```
+
+## Data pre-processing
+
+We investigate the data by dividing it by stage and taxonomic class. We determine the number of cells and occurrences for each stage.
+
+```{r, message=FALSE}
 
 # Data balance.
 pbdb |> 
@@ -220,19 +414,10 @@ pbdb |>
         strip.text = element_text(face = "bold"),
         legend.position = "none",
         aspect.ratio = 1)
-```
 
-## Data pre-processing
-
-The globe is divided into a grid of equal-area icosahedral hexagonal cells using the `hexagrid()` function in `icosa`. In `hexagrid(deg = x)`, is roughly equivalent to longitudinal degrees, so that a degree of 1 is roughly equal to 111 km. This selects a tessellation vector, which translates to the amount of area you select for each cell. In our specified grid, each cell is roughly 600,000 km^2^ and results in a grid of 642 cells.
-
-```{r message=FALSE}
-# Create equal-area icosahedral hexagonal cells.
-hexa <- hexagrid(deg = 5, sf = TRUE)
 
 # Set min occurrences
 min_occ <- 20
-
 # Changhsingian cells.
 changhsingian_pbdb <-
   pbdb |> 
@@ -327,102 +512,6 @@ pbdb |>
         strip.text = element_text(face = "bold"))
 ```
 
-# Visualization of Cells and Occurrences
-
-Next, visualize all occurrences for each stage, using the package `rgplates` on R. Please note that this version requires that you have the `Gplates` software installed in your computer, as it is the most optimal version of `rgplates`.
-
-```{r}
-# Map visualizations
-
-# Get raw dataset before filtering for 20 occs
-pbdb.2 <- read.csv("/Users/geojood/Desktop/Homogenization/pbdb.2.csv")
-pbdb.2cha <- pbdb.2 |> filter(interval.ma==252.17)
-pbdb.2ind <- pbdb.2 |> filter(interval.ma==251.2)
-
-# Find raw locations for each stage:
-coords.cha <- subset(pbdb.2cha, select = c(paleolng, paleolat)) 
-coords.cha <- coords.cha |>  
-                          mutate_at(c('paleolng', 'paleolat'), as.numeric)
-coords.ind <- subset(pbdb.2ind, select = c(paleolng, paleolat)) 
-coords.ind <- coords.ind |>  
-                          mutate_at(c('paleolng', 'paleolat'), as.numeric)
-
-# Match cells with coordinates
-cells.cha <-locate(hexa,coords.cha) #to get no. of occupied cells
-#str(cells.cha) #to see which cells have occ's
-cells.ind <-locate(hexa,coords.ind)
-#str(cells.cha)
-
-tcells.cha <- table(cells.cha) 
-#str(tcells.cha) 
-tcells.ind <- table(cells.ind)
-#str(tcells.ind)
-
-# Call to Gplates offline (requires installed Gplates software)
-td <-tempdir() #temporary directory
-td
-rgPath <- system.file(package="rgplates")
-list.files(rgPath) #confirm that this is the correct path
-unzip(file.path(rgPath, "extdata/paleomap_v3.zip"), exdir=td)
-list.files(file.path(td)) #confirm extraction has happened by looking at temporary directory
-pathToPolygons <- file.path(td, "PALEOMAP_PlatePolygons.gpml") #static plate polygons
-pathToRotations <- file.path(td, "PALEOMAP_PlateModel.rot")
-
-pm <- platemodel(
-  features = c("static_polygons" = pathToPolygons),
-  rotation = pathToRotations
-)
-
-```
-
-**Grid Plots**
-
-Here, we visualize the grid we generated using the `icosa` and `rgplates` packages to display where cells and occurrences are located for each stage.
-
-```{r}
-# Plot it out:
-edge <-mapedge() #edge of the map
-plates.pt<- reconstruct("static_polygons", age= 252, model =pm)
-plot(edge, col = "lightblue2")
-plot(plates.pt$geometry, col = "gray60", border = NA, add = TRUE)
-plot(hexa,  border="white",add = TRUE)
-gridlabs(hexa, cex=0.5) #get labels for each cell, labeled as spiral from North pole of grid
-
-```
-
-**Changhsingian occurrences**
-
-Occurrences in the Changhsingian, with colors indicating the number of occurrences in occupied cells.
-
-```{r}
-#Permian:
-platesMoll <- sf::st_transform(plates.pt, "ESRI:54009")
-#^transform plates to Mollweide projection to plot
-plot(hexa, tcells.cha, 
-     crs ="ESRI:54009",
-     border = "lightgrey",
-     pal=c("#440154ff","darkorchid2","deepskyblue","royalblue", "goldenrod"),
-     breaks = c(0, 20, 100, 200, 400, 600),
-     reset=FALSE)
-plot(platesMoll$geometry, add = TRUE,border= NA, col = "#66666688")
-```
-
-**Induan occurrences**
-
-Occurrences in the Induan, with colors indicating the number of occurrences in occupied cells.
-
-```{r}
-#Triassic:
-plot(hexa, tcells.ind, 
-     crs ="ESRI:54009",
-     border = "lightgrey",
-     pal=c("#440154ff","darkorchid2","deepskyblue","royalblue", "goldenrod"),
-     breaks = c(0, 20, 100, 200, 400, 600),
-     reset=FALSE)
-plot(platesMoll$geometry, add = TRUE,border= NA, col = "#66666688")
-
-```
-
 For each stage we create individual dataframes based on the cell units and store these into separate lists.
 
 ```{r}
@@ -442,7 +531,7 @@ induan_split <-
 
 ## Subsampling by cells and occurence
 
-Here we perform bootstrap subsampling without replacement on our stage-level datasets using 999 iterations. For the Changhsingian we randomly sample 20 occurrences per cell and repeated the process as stated above. Conversely, for the Induan, we applied a two-step subsampling procedure by first subsampling down to 13 cells and then by occurrences. The results are bootstrapped datasets (cell-specific) saved as nested objects within a larger list. These are subsequently, merged into single master dataframes (i.e., the cells) to create one single list containing 999 dataframes.
+Here we perform subsampling without replacement on our stage-level datasets using 999 iterations. For the Changhsingian we randomly sample 20 occurrences per cell and repeated the process as stated above. Conversely, for the Induan, we applied a two-step subsampling procedure by first subsampling down to 13 cells and then by occurrences. The results are subsampled datasets (cell-specific) saved as nested objects within a larger list. These are subsequently, merged into single master dataframes (i.e., the cells) to create one single list containing 999 dataframes.
 
 ```{r}
 # Changhsingian.
@@ -538,11 +627,11 @@ cells_distinct_pair_in <-
 
 ### Jaccard indices
 
-**The Jaccard similiary equation**
+**The Jaccard similiary equation** following Miller et al., 2009
 
 $$ J(Cell X, Cell Y) = \frac{|Cell X \cap Cell Y|}{|Cell X \cup Cell Y|} $$
 
-```{r message=FALSE}
+```{r, message=FALSE}
 # Changhsingian.
 changhsingian_jaccard <- 
   jaccard_similarity(combined_boot_changhsingian)
@@ -552,7 +641,7 @@ induan_jaccard <-
   jaccard_similarity(combined_boot_induan)
 ```
 
-```{r message=FALSE}
+```{r, message=FALSE}
 # Average similarity for each cell-pair and stage.
 
 # Changhsingian.
@@ -574,8 +663,8 @@ ave_induan_jaccard <-
 
 ```{r}
 # Changhsingian.
-colnames(pbdb)[10] <- "lat"
-colnames(pbdb)[11] <- "long" 
+colnames(pbdb)[19] <- "lat"
+colnames(pbdb)[20] <- "long" 
 
 changhsingian_res_matrix <- cells_distinct_pair_ch |> 
   # X-coordinates
@@ -609,7 +698,7 @@ induan_res_matrix <- cells_distinct_pair_in |>
 
 ### Czekanowski indices
 
-**Czekanowski equation**
+**Czekanowski equation** following Miller et al., 2009
 
 $$ Czekanowski = 2 * \frac{\sum \min(x_{1k}, x_{2k})}{\sum x_{1k} + \sum x_{2k}} $$ The occurrence of a given taxa between distinct cells are evaluated against each other.
 
@@ -826,7 +915,7 @@ sumRes_03 |>
 
 <!-- Czekanowski -->
 
-```{r message=FALSE}
+```{r, message=FALSE}
 # Changhsingian
 changhsingian_res_matrix <-
   changhsingian_res_matrix |>
@@ -923,15 +1012,15 @@ sV <- pbdb_sensitivity |>
   filter(early_interval == "Changhsingian" & ex==1) |>
   group_split(cell_id) |> lapply(as.data.frame)
 
-# Changhsingian survivals.
+# Changhsingian survivors.
 sC <- pbdb_sensitivity |> filter(early_interval  == "Changhsingian" & ex==0) |>
   group_split(cell_id) |> lapply(as.data.frame)
 
-# Bootstrap subsampling.
+# Subsampling.
 subsampling_fun <-
   function(x, n_boot = 999, sample_size = 12, seed = 5) {
   set.seed(seed)
-  # Bootstrap samples.
+  # Samples.
   boot_samples <- purrr::map(1:n_boot, ~ sample(x, sample_size, replace = FALSE))
   # Combine cells into single dataframes.
   comb_samples <- purrr::map(boot_samples, ~ map_dfr(.x, bind_rows))
@@ -953,13 +1042,13 @@ sC_boot <- subsampling_fun(sC)
 induan_survivors_jaccard <- jaccard_similarity(sI_boot)
 # Changhsingian victims.
 changhsingian_victims_jaccard <- jaccard_similarity(sV_boot)
-# Changhsingian survivals.
+# Changhsingian survivors.
 changhsingian_survivors_jaccard <- jaccard_similarity(sC_boot)
 ```
 
 **Averages**
 
-```{r message=FALSE}
+```{r, message=FALSE}
 # Mean jaccard for the Induan survivors.
 aIsJ <- 
   bind_rows(induan_survivors_jaccard) |>
@@ -974,7 +1063,7 @@ aCvJ <-
   summarise(avg_jaccard = mean(jaccard_similarity)) |> 
   rename("x.cell" = "cell_x", "y.cell" = "cell_y")
 
-# Changhsingian survivals.
+# Changhsingian survivors.
 aCsJ <- 
   bind_rows(changhsingian_survivors_jaccard) |>
   group_by(cell_x, cell_y) |> 
@@ -1054,8 +1143,8 @@ sumRes_10 |>
   geom_line(linewidth = 1.2) +
   scale_size_continuous(breaks = c(5,10,15,20,25,30)) +
   geom_point(aes(size = n),shape = 21, fill = "white", stroke = 2) +
-  scale_fill_manual(values =  c("lightseagreen","slateblue3", "violetred")) + 
-  scale_color_manual(values = c("lightseagreen","slateblue3", "violetred")) + 
+  scale_fill_manual(values =  c("#006633","slateblue3", "violetred")) + 
+  scale_color_manual(values = c("#006633","slateblue3", "violetred")) + 
   labs(x = "Great Circle Distance (km)", 
        y = "Similarity Value",
        title = "Jaccard by survival status",
@@ -1162,7 +1251,7 @@ append_flat_Cs <- mapply(function(x, y) cbind(y, x), flat_Cs, sp_03, SIMPLIFY = 
 res_Cs <- bind_rows(append_flat_Cs) |> rename("x.cell" = "cell_x", "y.cell" = "cell_y")
 ```
 
-```{r message=FALSE}
+```{r, message=FALSE}
 # Averages.
 ave_s1 <- res_Is |> 
   group_by(x.cell,y.cell) |>
