@@ -857,7 +857,7 @@ induan_res_matrix$cutdist <-
                        include.lowest = TRUE)
 
 # Average and sd for Changhsingian.
-sumRes_01 <- 
+sumRes_01 <-
   changhsingian_res_matrix |> 
   group_by(cutdist) |> 
   summarise(
@@ -865,7 +865,10 @@ sumRes_01 <-
     avg =  mean(avg_jaccard, na.rm = TRUE),
     sdev = sd(avg_jaccard, na.rm = TRUE),
     n = n(),
-    se = sdev/sqrt(n)
+    se = sdev/sqrt(n),
+    # Quantiles
+    first = quantile(avg_jaccard,probs=0.25),
+    second = quantile(avg_jaccard,probs=0.975)
   ) |> 
   mutate(label = 'Changhsingian',label = as.factor(label)) |> 
   mutate(cutdist = cutdist,
@@ -882,7 +885,10 @@ sumRes_02 <-
     avg =  mean(avg_jaccard, na.rm = TRUE),
     sdev = sd(avg_jaccard, na.rm = TRUE),
     n = n(),
-    se = sdev/sqrt(n)
+    se = sdev/sqrt(n),
+     # Quantiles
+    first = quantile(avg_jaccard,probs=0.25),
+    second = quantile(avg_jaccard,probs=0.975)
   ) |> 
   mutate(label = 'Induan',label = as.factor(label)) |> 
   mutate(cutdist = cutdist,
@@ -896,7 +902,7 @@ sumRes_03 <- bind_rows(sumRes_01,sumRes_02)
 # Plot.
 sumRes_03 |> 
   ggplot(aes(x = cutdist, y = avg, group = label, colour = label, fill = label)) +
-  geom_errorbar(aes(ymin = pmax(avg-sdev), ymax=avg+sdev), width=0.05,linewidth=1) +
+  geom_errorbar(aes(ymin = pmax(second), ymax=first), width=0.05,linewidth=1)+
   geom_line(linewidth = 1.2) +
   scale_size_continuous(breaks = c(5,10,15,20,25,30)) +
   geom_point(aes(size = n),shape = 21, fill = "white", stroke = 2) +
@@ -948,7 +954,10 @@ sumRes_04 <-
     avg =  mean(avg_cz, na.rm = TRUE),
     sdev = sd(avg_cz, na.rm = TRUE),
     n = n(),
-    se = sdev/sqrt(n)
+    se = sdev/sqrt(n),
+        # Quantiles
+    first = quantile(avg_cz,probs=0.25),
+    second = quantile(avg_cz,probs=0.975)
   ) |>
   mutate(label = 'Changhsingian',label = as.factor(label)) |>
   mutate(cutdist = cutdist,
@@ -963,7 +972,10 @@ sumRes_05 <-
     avg =  mean(avg_cz, na.rm = TRUE),
     sdev = sd(avg_cz, na.rm = TRUE),
     n = n(),
-    se = sdev/sqrt(n)
+    se = sdev/sqrt(n),
+    # Quantiles
+    first = quantile(avg_cz,probs=0.25),
+    second = quantile(avg_cz,probs=0.975)
   ) |>
   mutate(label = 'Induan',label = as.factor(label)) |>
   mutate(cutdist = cutdist,
@@ -976,7 +988,7 @@ sumRes_06 <- bind_rows(sumRes_04,sumRes_05)
 # Plot.
 sumRes_06 |>
   ggplot(aes(x = cutdist, y = avg, group = label, colour = label, fill = label)) +
-  geom_errorbar(aes(ymin = pmax(avg-sdev), ymax=avg+sdev), width=0.05,linewidth=1) +
+  geom_errorbar(aes(ymin =second, ymax=first), width=0.05,linewidth=1)+ 
   geom_line(linewidth = 1.2) +
   scale_size_continuous(breaks = c(5,10,15,20,25,30)) +
   geom_point(aes(size = n),shape = 21, fill = "white", stroke = 2) +
@@ -1091,7 +1103,10 @@ sumRes_07 <-
     avg =  mean(avg_jaccard, na.rm = TRUE),
     sdev = sd(avg_jaccard, na.rm = TRUE),
     n = n(),
-    se = sdev/sqrt(n)
+    se = sdev/sqrt(n),
+       # Quantiles
+    first = quantile(avg_jaccard,probs=0.25),
+    second = quantile(avg_jaccard,probs=0.975)
   ) |> 
   mutate(label = 'Induan survivors',label = as.factor(label)) |> 
   mutate(cutdist = cutdist,
@@ -1108,7 +1123,10 @@ sumRes_08 <-
     avg =  mean(avg_jaccard, na.rm = TRUE),
     sdev = sd(avg_jaccard, na.rm = TRUE),
     n = n(),
-    se = sdev/sqrt(n)
+    se = sdev/sqrt(n),
+    # Quantiles
+    first = quantile(avg_jaccard,probs=0.25, na.rm=TRUE),
+    second = quantile(avg_jaccard,probs=0.975, na.rm=TRUE)
   ) |> 
   mutate(label = 'Changhsingian victims',label = as.factor(label)) |> 
   mutate(cutdist = cutdist,
@@ -1125,7 +1143,10 @@ sumRes_09 <-
     avg =  mean(avg_jaccard, na.rm = TRUE),
     sdev = sd(avg_jaccard, na.rm = TRUE),
     n = n(),
-    se = sdev/sqrt(n)
+    se = sdev/sqrt(n),
+       # Quantiles
+    first = quantile(avg_jaccard,probs=0.25),
+    second = quantile(avg_jaccard,probs=0.975)
   ) |> 
   mutate(label = 'Changhsingian survivors',label = as.factor(label)) |> 
   mutate(cutdist = cutdist,
@@ -1139,12 +1160,12 @@ sumRes_10 <- bind_rows(sumRes_07,sumRes_08,sumRes_09)
 # Plot.
 sumRes_10 |> 
   ggplot(aes(x = cutdist, y = avg, group = label, colour = label, fill = label)) +
-  geom_errorbar(aes(ymin = pmax(avg-sdev), ymax=avg+sdev), width=0.05,linewidth=1, alpha=0.7) +
+  geom_errorbar(aes(ymin = second, ymax = first), width=0.05,linewidth=1, alpha=0.7) +
   geom_line(linewidth = 1.2) +
   scale_size_continuous(breaks = c(5,10,15,20,25,30)) +
   geom_point(aes(size = n),shape = 21, fill = "white", stroke = 2) +
-  scale_fill_manual(values =  c("#006633","slateblue3", "violetred")) + 
-  scale_color_manual(values = c("#006633","slateblue3", "violetred")) + 
+  scale_fill_manual(values =  c("lightseagreen","slateblue3", "violetred")) + 
+  scale_color_manual(values = c("lightseagreen","slateblue3", "violetred")) + 
   labs(x = "Great Circle Distance (km)", 
        y = "Similarity Value",
        title = "Jaccard by survival status",
@@ -1293,7 +1314,10 @@ sumRes_11 <-
     avg =  mean(avg_cz, na.rm = TRUE),
     sdev = sd(avg_cz, na.rm = TRUE),
     n = n(),
-    se = sdev/sqrt(n)
+    se = sdev/sqrt(n),
+    # quantiles
+    first = quantile(avg_cz,probs=0.25),
+    second = quantile(avg_cz,probs=0.975)
   ) |> 
   mutate(label = 'Induan survivors',label = as.factor(label)) |> 
   mutate(cutdist = cutdist,
@@ -1309,7 +1333,10 @@ sumRes_12 <-
     avg =  mean(avg_cz, na.rm = TRUE),
     sdev = sd(avg_cz, na.rm = TRUE),
     n = n(),
-    se = sdev/sqrt(n)
+    se = sdev/sqrt(n),
+       # Quantiles
+    first = quantile(avg_cz,probs=0.25),
+    second = quantile(avg_cz,probs=0.975)
   ) |> 
   mutate(label = 'Changhsingian victims',label = as.factor(label)) |> 
   mutate(cutdist = cutdist,
@@ -1325,7 +1352,10 @@ sumRes_13 <-
     avg =  mean(avg_cz, na.rm = TRUE),
     sdev = sd(avg_cz, na.rm = TRUE),
     n = n(),
-    se = sdev/sqrt(n)
+    se = sdev/sqrt(n),
+       # Quantiles
+    first = quantile(avg_cz,probs=0.25),
+    second = quantile(avg_cz,probs=0.975)
   ) |> 
   mutate(label = 'Changhsingian survivors',label = as.factor(label)) |> 
   mutate(cutdist = cutdist,
@@ -1339,7 +1369,7 @@ sumRes_14 <- bind_rows(sumRes_11,sumRes_12,sumRes_13)
 # Plot.
 sumRes_14 |> 
   ggplot(aes(x = cutdist, y = avg, group = label, colour = label, fill = label)) +
-  geom_errorbar(aes(ymin = pmax(avg-sdev), ymax=avg+sdev), width=0.05,linewidth=1, alpha=0.7) +
+  geom_errorbar(aes(ymin =  second, ymax=first), width=0.05,linewidth=1, alpha=0.7) +
   geom_line(linewidth = 1.2) +
   scale_size_continuous(breaks = c(5,10,15,20,25,30)) +
   geom_point(aes(size = n),shape = 21, fill = "white", stroke = 2) +
@@ -1354,4 +1384,24 @@ sumRes_14 |>
         axis.title = element_text(face = "bold"),
         legend.title = element_text(face = "bold"),
         aspect.ratio = 1)
+
+```
+
+## Extra
+
+Count occurrences per genus in the Induan to determine whether they match the disaster taxa in literature (Claraia, Eumorphotis, etc).
+
+```{r}
+# find 5 top genera based on number of occurrences 
+genus_counts <- pbdb.2ind  |>
+                group_by(accepted_name) |> 
+               summarise(count = n()) |> 
+               top_n(5, wt = count) |> 
+               arrange(desc(count))
+
+# visualize it
+ggplot(genus_counts, aes(x = accepted_name, y = count)) +
+  theme_classic() +
+  geom_bar(stat = "identity", fill = "dodgerblue3") +
+  labs(x = "Genus Name", y = "Number of Occurrences")
 ```
