@@ -252,7 +252,7 @@ pbdb <- pbdb |>
 
 # Visualization of Cells and Occurrences
 
-The globe is divided into a grid of equal-area icosahedral hexagonal cells using the `hexagrid()` function in `icosa`. In `hexagrid(deg = x)`, is roughly equivalent to longitudinal degrees, so that a degree of 1 is roughly equal to 111 km. This selects a tessellation vector, which translates to the amount of area you select for each cell. In our specified grid, each cell is roughly 600,000 km^2^ and results in a grid of 642 cells.
+The globe is divided into a grid of equal-area icosahedral hexagonal cells using the `hexagrid()` function in `icosa`. In `hexagrid(deg = x)`, is roughly equivalent to longitudinal degrees, so that a degree of 1 is roughly equal to 111 km. This selects a tessellation vector, which translates to the amount of area you select for each cell. In our specified grid, each cell is roughly 629,000 km^2^ and results in a grid of 812 cells.
 
 ```{r, message=FALSE}
 
@@ -269,7 +269,7 @@ coords.ind <- coords.ind |>
                           mutate_at(c('paleolng', 'paleolat'), as.numeric)
 
 # Set up the grid
-hexa <-hexagrid(deg=5, sf=TRUE) #each deg = ~111 km
+hexa <-hexagrid(deg=4.5, sf=TRUE) #each deg = ~111 km
 hexa
 
 # Find cell locations for each occurrence
@@ -529,7 +529,7 @@ induan_split <-
   lapply(as.data.frame)
 ```
 
-## Subsampling by cells and occurence
+## Subsampling by cells and occurrence
 
 Here we perform subsampling without replacement on our stage-level datasets using 999 iterations. For the Changhsingian we randomly sample 20 occurrences per cell and repeated the process as stated above. Conversely, for the Induan, we applied a two-step subsampling procedure by first subsampling down to 13 cells and then by occurrences. The results are subsampled datasets (cell-specific) saved as nested objects within a larger list. These are subsequently, merged into single master dataframes (i.e., the cells) to create one single list containing 999 dataframes.
 
@@ -1392,7 +1392,7 @@ sumRes_14 |>
 Count occurrences per genus in the Induan to determine whether they match the disaster taxa in literature (Claraia, Eumorphotis, etc).
 
 ```{r}
-# find 5 top genera based on number of occurrences 
+# find the top 5 genera based on number of occurrences 
 genus_counts <- pbdb.2ind  |>
                 group_by(accepted_name) |> 
                summarise(count = n()) |> 
