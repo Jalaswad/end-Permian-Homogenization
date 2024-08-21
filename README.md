@@ -10,7 +10,7 @@ Contact: jalaswad@stanford.edu
 
 **All codes and data used in this paper are provided here for reproducibility.**
 
-Please start with fossil occurrence data by opening index.html, which is accompanied by the source code index.qmd. All codes and files pertaining to the oceanographic models and ecophysiotype similarity measures are in the "Model Analyses" folder.
+Please start with download_pbdb_new.R to download the raw dataset used in this study. Then, the fossil occurrence analyes can be found and reproduced by opening index.html, which is accompanied by the source code index.qmd. All codes and files pertaining to the oceanographic models and ecophysiotype similarity measures are in the "Model Analyses" folder.
 
 Access the study’s .Rdata object, containing all data and results, using: piggyback!
 
