@@ -3,6 +3,8 @@
 # function to eliminate occurrences that are not constrained to geological age
 # modified from velociraptr package 
 
+# This code has been written primarily by: Noel A. Heim (Github username naheim ),
+# Jonathan L. Payne, and Pedro Monarrez.
 
 constrainAges <- function (Data, Timescale) 
 {
