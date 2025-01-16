@@ -1,6 +1,6 @@
 # READ ME
 
-This GitHub repository contains the data and code used in analysis of all datasets used in Physiologically driven homogenization of marine ecosystems after the end-Permian mass extinction.
+This GitHub repository contains the data and code used in analysis of all datasets used in Physiology and climate change explain unusually high similarity across marine communities after end-Permian mass extinction
 
 by Jood Al Aswad, Justin Penn, Pedro Monarrez, Mohamad Bazzi, Curtis Deutsch and Jonathan Payne
 
