@@ -10,7 +10,7 @@ Contact: jalaswad@stanford.edu
 
 **All codes and data used in this paper are provided here for reproducibility.**
 
-There are two ways to access the Paleobiology Database data used in this study. You may either use R to start with download_pbdb_new.R to download the raw dataset used in this study with instructions on how to process and clean that data in index.qmd, or if you do not wish to download the data and wish to simply look at the data utilized here, then you can alternatively open pbdb.csv.
+There are two ways to access the Paleobiology Database data used in this study. You may either open pbdb.csv for the dataset utilized here, or if you wish to download straight from the database, you may use R and start with download_pbdb_new.R to download the raw dataset used in this study with instructions on how to process and clean that data in index.qmd.
 
 The fossil occurrence analyes can be found and reproduced by opening index.html, which is accompanied by the source code index.qmd. All codes and files pertaining to the oceanographic models and ecophysiotype similarity measures are in the "Model Analyses" folder.
 
