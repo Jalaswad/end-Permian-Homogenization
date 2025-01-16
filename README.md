@@ -1,6 +1,6 @@
 # READ ME
 
-This GitHub repository contains the code used in analysis of all datasets used in Physiologically driven homogenization of marine ecosystems after the end-Permian mass extinction.
+This GitHub repository contains the data and code used in analysis of all datasets used in Physiologically driven homogenization of marine ecosystems after the end-Permian mass extinction.
 
 by Jood Al Aswad, Justin Penn, Pedro Monarrez, Mohamad Bazzi, Curtis Deutsch and Jonathan Payne
 
@@ -10,7 +10,7 @@ Contact: jalaswad@stanford.edu
 
 **All codes and data used in this paper are provided here for reproducibility.**
 
-Please start with download_pbdb_new.R to download the raw dataset used in this study. If you do not wish to download the data using R, or you wish to simply look at the data utilized here, then you can alternatively open pbdb.csv which is provided here and shows the data used after filtering and cleaning for spatial and taxonomic errors.
+There are two ways to access the Paleobiology Database data used in this study. You may either use R to start with download_pbdb_new.R to download the raw dataset used in this study with instructions on how to process and clean that data in index.qmd, or if you do not wish to download the data and wish to simply look at the data utilized here, then you can alternatively open pbdb.csv which is provided here and has already been processed.
 
 The fossil occurrence analyes can be found and reproduced by opening index.html, which is accompanied by the source code index.qmd. All codes and files pertaining to the oceanographic models and ecophysiotype similarity measures are in the "Model Analyses" folder.
 
